@@ -37,6 +37,65 @@ GAME_OVER = False
 GAME_STARTED = False
 start_ticks = 0
 
+class Mouse:
+    def __init__(self):
+        self.image = storage.mouse_images[0]
+        self.rect = self.image.get_rect()
+        self.rect.centerx = WIDTH / 2 - 180
+        self.rect.bottom = HEIGHT - 120
+        self.speedx = 0
+        self.last_sprite_update = pygame.time.get_ticks()
+        self.i = 0
+        self.lives = 7
+        self.is_right = True
+
+    def update(self):
+        if self.lives > 0:
+            animation(self, storage.mouse_images, 35, True)
+            self.speedx = 0
+            keystate = pygame.key.get_pressed()
+            if keystate[pygame.K_LEFT]:
+                self.speedx = -5
+                self.is_right = False
+            elif keystate[pygame.K_RIGHT]:
+                self.speedx = 5
+                self.is_right = True
+            self.rect.x += self.speedx
+            if self.rect.left > 1100:
+                self.rect.left = 1100
+            if self.rect.left < 0:
+                self.rect.left = 0
+            screen.blit(pygame.transform.flip(self.image, self.is_right,False),self.rect)
+
+    def take_damage(self):
+        self.lives -= 1
+
+class Cheese(pygame.sprite.Sprite):
+    def __init__(self, x, speed):
+        pygame.sprite.Sprite.__init__(self)
+        r = random.randint(0,2)
+        print(r)
+        self.image = storage.cheese_images[r]
+        self.rect = self.image.get_rect()
+        self.rect.bottom = HEIGHT - 700
+        self.rect.centerx = x
+        self.speedy = speed
+        self.last_sprite_update = pygame.time.get_ticks()
+        self.i = 0
+        self.is_alive = True
+
+    def update(self):
+        self.rect.y += self.speedy
+        if self.is_alive:
+            if is_collided_with(self, mouse):
+                self.speedy = 0
+                self.is_alive = False
+            if self.rect.bottom < 0:
+                self.speedy = 0
+                self.is_alive = False
+        else:
+            cheeses.remove(self)
+
 class Background:
     def __init__(self):
         self.image = storage.background_images[0]
@@ -50,12 +109,29 @@ class Background:
 # класс для загрузки всех спрайтов
 class Storage:
     def __init__(self):
-        self.mouse_image = load_images("mouse", 23, 0)
-        self.background_images = load_images("background", 9, 0)
+        self.mouse_images = load_images("mouse", 23, int(530 / 3), int(180 / 3))
+        self.cheese_images = load_images("falling_cheese", 3, 80, 80)
+        self.background_images = load_images("background", 9, 0, 0)
         self.floor_image = pygame.transform.scale(pygame.image.load(resource_path(os.path.join("venv\\Sprites\\floor.png"))).convert_alpha(), (WIDTH,400))
         self.floor_rect = self.floor_image.get_rect()
         self.floor_rect.y += 300
         self.foreground_image = pygame.image.load(resource_path(os.path.join("venv\\Sprites\\foreground.png"))).convert_alpha()
+
+class Spawner:
+    def __init__(self):
+        self.speed = 1400
+        self.last_update = pygame.time.get_ticks()
+        self.difficulty = 1
+        self.i = 0
+
+    def update(self):
+        now = pygame.time.get_ticks()
+        if now - self.last_update > self.speed - self.difficulty:
+            self.last_update = now
+            cheese = Cheese(random.randint(100, 1000), 2)
+            cheeses.add(cheese)
+            self.i += 1
+            self.difficulty += self.difficulty / self.i
 
 # метод для проигрывания анимации
 def animation(Entity, images, speed, endless):
@@ -88,9 +164,9 @@ def is_pressed_by_mouse(Entity):
     return Entity.rect.left < mouse_x < Entity.rect.left + Entity.rect.width and Entity.rect.top < mouse_y < Entity.rect.top + Entity.rect.height
 
 # метод для загрузки нескольких спрайтов в массив
-def load_images(name, count, scale):
+def load_images(name, count, scaleX,scaleY):
     array = []
-    if scale == 0:
+    if scaleX == 0 and scaleY == 0:
         for i in range(count):
             try:
                 array.append(pygame.image.load(resource_path(os.path.join("venv\\Sprites\\", str(name) + str(i + 1) + ".png"))).convert_alpha())
@@ -100,7 +176,7 @@ def load_images(name, count, scale):
         for i in range(count):
             try:
                 array.append(pygame.transform.scale(
-                    pygame.image.load(resource_path(os.path.join("venv\\Sprites\\", str(name) + str(i + 1) + ".png"))).convert_alpha(), (scale, scale)))
+                    pygame.image.load(resource_path(os.path.join("venv\\Sprites\\", str(name) + str(i + 1) + ".png"))).convert_alpha(), (scaleX, scaleY)))
             except Warning:
                 print(Warning)
 
@@ -111,9 +187,12 @@ def print_text(text, size, color, x, y):
     font = pygame.font.Font(resource_path(os.path.join("venv\\Fonts\\","MinecraftFont.ttf")), size)
     screen.blit(font.render(text, True, color), (x, y))
 
-
 storage = Storage()
+cheeses = pygame.sprite.Group()
+cheeses.add(Cheese(100, 3))
 background = Background()
+mouse = Mouse()
+spawner = Spawner()
 # переменная от которой зависит цикл игры
 running = True
 
@@ -125,8 +204,13 @@ while running:
         # если игрок закрывает окно, то прекратить цикл
         if event.type == pygame.QUIT:
             running = False
-
     background.update()
+
+
+    spawner.update()
+    mouse.update()
+    cheeses.update()
+    cheeses.draw(screen)
     screen.blit(storage.floor_image, storage.floor_rect)
     screen.blit(storage.foreground_image,storage.foreground_image.get_rect())
     pygame.display.flip()
