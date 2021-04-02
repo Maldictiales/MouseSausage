@@ -39,6 +39,7 @@ start_ticks = 0
 
 class Mouse:
     def __init__(self):
+        self.move_speed = 6
         self.image = storage.mouse_images[0]
         self.rect = self.image.get_rect()
         self.rect.centerx = WIDTH / 2 - 180
@@ -55,10 +56,10 @@ class Mouse:
             self.speedx = 0
             keystate = pygame.key.get_pressed()
             if keystate[pygame.K_LEFT]:
-                self.speedx = -5
+                self.speedx = -1 * self.move_speed
                 self.is_right = False
             elif keystate[pygame.K_RIGHT]:
-                self.speedx = 5
+                self.speedx = self.move_speed
                 self.is_right = True
             self.rect.x += self.speedx
             if self.rect.left > 1100:
@@ -81,20 +82,37 @@ class Cheese(pygame.sprite.Sprite):
         self.rect.centerx = x
         self.speedy = speed
         self.last_sprite_update = pygame.time.get_ticks()
+        self.orig_image = self.image
         self.i = 0
+        self.angle = 0
         self.is_alive = True
 
     def update(self):
+        self.angle += 2
+        self.rotate()
         self.rect.y += self.speedy
         if self.is_alive:
             if is_collided_with(self, mouse):
                 self.speedy = 0
+                scores_.scores += 1
                 self.is_alive = False
             if self.rect.bottom < 0:
                 self.speedy = 0
                 self.is_alive = False
         else:
             cheeses.remove(self)
+
+    def rotate(self):
+
+        self.image = pygame.transform.rotozoom(self.orig_image, self.angle, 1)
+        self.rect = self.image.get_rect(center=self.rect.center)
+
+class Scores:
+    def __init__(self):
+        self.scores = 0
+
+    def update(self):
+        print_text("SCORES: " + str(self.scores), 30, WHITE, 50, 50)
 
 class Background:
     def __init__(self):
@@ -126,12 +144,14 @@ class Spawner:
 
     def update(self):
         now = pygame.time.get_ticks()
-        if now - self.last_update > self.speed - self.difficulty:
+        mouse.move_speed = scores_.scores/10 + 5
+        if now - self.last_update > self.speed - scores_.scores*5:
             self.last_update = now
-            cheese = Cheese(random.randint(100, 1000), 2)
+            cheese = Cheese(random.randint(100, 1000), 2 + scores_.scores/10)
             cheeses.add(cheese)
             self.i += 1
             self.difficulty += self.difficulty / self.i
+
 
 # метод для проигрывания анимации
 def animation(Entity, images, speed, endless):
@@ -184,7 +204,7 @@ def load_images(name, count, scaleX,scaleY):
 
 # метод для отображения текста на экране
 def print_text(text, size, color, x, y):
-    font = pygame.font.Font(resource_path(os.path.join("venv\\Fonts\\","MinecraftFont.ttf")), size)
+    font = pygame.font.SysFont('Arial', size)
     screen.blit(font.render(text, True, color), (x, y))
 
 storage = Storage()
@@ -192,6 +212,7 @@ cheeses = pygame.sprite.Group()
 cheeses.add(Cheese(100, 3))
 background = Background()
 mouse = Mouse()
+scores_ = Scores()
 spawner = Spawner()
 # переменная от которой зависит цикл игры
 running = True
@@ -213,5 +234,6 @@ while running:
     cheeses.draw(screen)
     screen.blit(storage.floor_image, storage.floor_rect)
     screen.blit(storage.foreground_image,storage.foreground_image.get_rect())
+    scores_.update()
     pygame.display.flip()
 sys.exit()
