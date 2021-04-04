@@ -35,7 +35,6 @@ clock = pygame.time.Clock()
 PAUSED = False
 GAME_OVER = False
 GAME_STARTED = False
-start_ticks = 0
 
 class Mouse:
     def __init__(self):
@@ -74,9 +73,7 @@ class Mouse:
 class Cheese(pygame.sprite.Sprite):
     def __init__(self, x, speed):
         pygame.sprite.Sprite.__init__(self)
-        r = random.randint(0,2)
-        print(r)
-        self.image = storage.cheese_images[r]
+        self.image = storage.cheese_images[random.randint(0,2)]
         self.rect = self.image.get_rect()
         self.rect.bottom = HEIGHT - 700
         self.rect.centerx = x
@@ -96,14 +93,13 @@ class Cheese(pygame.sprite.Sprite):
                 self.speedy = 0
                 scores_.scores += 1
                 self.is_alive = False
-            if self.rect.bottom < 0:
+            if self.rect.bottom > HEIGHT:
                 self.speedy = 0
                 self.is_alive = False
         else:
             cheeses.remove(self)
 
     def rotate(self):
-
         self.image = pygame.transform.rotozoom(self.orig_image, self.angle, 1)
         self.rect = self.image.get_rect(center=self.rect.center)
 
@@ -113,6 +109,87 @@ class Scores:
 
     def update(self):
         print_text("SCORES: " + str(self.scores), 30, WHITE, 50, 50)
+
+class Button:
+    def __init__(self, name, func):
+        self.image_normal = self.load_button_image(name, 250, 125)
+        self.image_in_focus = pygame.transform.scale(self.image_normal, (255, 130))
+        self.image = self.image_normal
+        self.rect = self.image.get_rect()
+        self.func = func
+
+    def draw(self):
+        if mouse_in_rect(self):
+            self.image = self.image_in_focus
+        else:
+            self.image = self.image_normal
+        screen.blit(self.image,self.rect)
+
+    def is_clicked(self):
+        if mouse_in_rect(self):
+            self.func()
+
+    def load_button_image(self, name, scaleX, scaleY):
+        return pygame.transform.scale(
+            pygame.image.load(
+                resource_path(os.path.join("venv\\Sprites\\" + name + ".png"))).convert_alpha(), (scaleX, scaleY))
+
+class Menu:
+    def __init__(self):
+        self.local_x = 455
+        self.local_y = 800
+        self.buttons = [Button("button_start", self.start),
+                        Button("button_quit", self.quit)]
+        self.move_up = True
+        self.in_menu = True
+        self.fade_in = True
+        self.fade_alpha = 0
+
+    def update(self):
+        if self.in_menu:
+            if self.move_up:
+                self.moving_up()
+            if self.fade_in:
+                fade = storage.fade_image
+                fade.set_alpha(255 - self.fade_alpha)
+                screen.blit(fade, fade.get_rect())
+                if fade.get_alpha() > 100:
+                    self.fade_alpha += 1
+            for i in range(len(self.buttons)):
+                self.buttons[i].rect.x = self.local_x
+                self.buttons[i].rect.y = self.local_y + i * 100
+                self.buttons[i].draw()
+        if not self.in_menu:
+            if not self.move_up:
+                self.moving_down()
+            if self.fade_in:
+                fade = storage.fade_image
+                fade.set_alpha(255 - self.fade_alpha)
+                screen.blit(fade, fade.get_rect())
+                if fade.get_alpha() > 0:
+                    self.fade_alpha += 1
+                else:
+                    self.fade_in = False
+    def buttons_is_pressed(self):
+        for button in self.buttons:
+            button.is_clicked()
+
+    def moving_up(self):
+        self.move_up = True
+        self.local_y -= 15
+        if self.local_y < 200:
+            self.move_up = False
+
+    def moving_down(self):
+        self.local_y += 15
+        if self.local_y > 300:
+            self.move_up = True
+
+    def start(self):
+        self.in_menu = False
+
+    def quit(self):
+        sys.exit()
 
 class Background:
     def __init__(self):
@@ -129,11 +206,19 @@ class Storage:
     def __init__(self):
         self.mouse_images = load_images("mouse", 23, int(530 / 3), int(180 / 3))
         self.cheese_images = load_images("falling_cheese", 3, 80, 80)
+        self.cheese_pieses_images = load_images("cheesepiece", 5, 100, 100)
         self.background_images = load_images("background", 9, 0, 0)
-        self.floor_image = pygame.transform.scale(pygame.image.load(resource_path(os.path.join("venv\\Sprites\\floor.png"))).convert_alpha(), (WIDTH,400))
+        self.fade_image = pygame.transform.scale(
+            pygame.image.load(
+                resource_path(os.path.join("venv\\Sprites\\fade.png"))).convert_alpha(), (WIDTH,HEIGHT))
+        self.floor_image = pygame.transform.scale(
+            pygame.image.load(
+                resource_path(os.path.join("venv\\Sprites\\floor.png"))).convert_alpha(), (WIDTH,400))
         self.floor_rect = self.floor_image.get_rect()
         self.floor_rect.y += 300
-        self.foreground_image = pygame.image.load(resource_path(os.path.join("venv\\Sprites\\foreground.png"))).convert_alpha()
+        self.foreground_image = pygame.image.load(
+            resource_path(os.path.join("venv\\Sprites\\foreground.png"))).convert_alpha()
+        self.foreground_rect = self.foreground_image.get_rect()
 
 class Spawner:
     def __init__(self):
@@ -151,7 +236,6 @@ class Spawner:
             cheeses.add(cheese)
             self.i += 1
             self.difficulty += self.difficulty / self.i
-
 
 # метод для проигрывания анимации
 def animation(Entity, images, speed, endless):
@@ -179,7 +263,7 @@ def animation(Entity, images, speed, endless):
 def is_collided_with(self, sprite):
     return self.rect.colliderect(sprite.rect)
 
-def is_pressed_by_mouse(Entity):
+def mouse_in_rect(Entity):
     mouse_x, mouse_y = pygame.mouse.get_pos()
     return Entity.rect.left < mouse_x < Entity.rect.left + Entity.rect.width and Entity.rect.top < mouse_y < Entity.rect.top + Entity.rect.height
 
@@ -214,6 +298,7 @@ background = Background()
 mouse = Mouse()
 scores_ = Scores()
 spawner = Spawner()
+menu = Menu()
 # переменная от которой зависит цикл игры
 running = True
 
@@ -225,6 +310,8 @@ while running:
         # если игрок закрывает окно, то прекратить цикл
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.constants.MOUSEBUTTONDOWN:
+            menu.buttons_is_pressed()
     background.update()
 
 
@@ -233,7 +320,9 @@ while running:
     cheeses.update()
     cheeses.draw(screen)
     screen.blit(storage.floor_image, storage.floor_rect)
-    screen.blit(storage.foreground_image,storage.foreground_image.get_rect())
+    menu.update()
+    screen.blit(storage.foreground_image,storage.foreground_rect)
     scores_.update()
+    print_text(str(int(clock.get_fps())), 10, WHITE, 5, 5)
     pygame.display.flip()
 sys.exit()
