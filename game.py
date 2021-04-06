@@ -32,9 +32,6 @@ pygame.font.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("MouseSausage")
 clock = pygame.time.Clock()
-PAUSED = False
-GAME_OVER = False
-GAME_STARTED = False
 
 class Mouse:
     def __init__(self):
@@ -65,7 +62,9 @@ class Mouse:
                 self.rect.left = 1100
             if self.rect.left < 0:
                 self.rect.left = 0
-            screen.blit(pygame.transform.flip(self.image, self.is_right,False),self.rect)
+
+    def draw(self):
+        screen.blit(pygame.transform.flip(self.image, self.is_right, False), self.rect)
 
     def take_damage(self):
         self.lives -= 1
@@ -140,50 +139,49 @@ class Menu:
         self.local_y = 800
         self.buttons = [Button("button_start", self.start),
                         Button("button_quit", self.quit)]
-        self.move_up = True
+        self.move_up = False
         self.in_menu = True
-        self.fade_in = True
-        self.fade_alpha = 0
+        self.move_down = False
 
     def update(self):
+        if self.move_down:
+            self.moving_down()
+        if self.move_up:
+            self.moving_up()
+
         if self.in_menu:
-            if self.move_up:
-                self.moving_up()
-            if self.fade_in:
-                fade = storage.fade_image
-                fade.set_alpha(255 - self.fade_alpha)
-                screen.blit(fade, fade.get_rect())
-                if fade.get_alpha() > 100:
-                    self.fade_alpha += 1
+            self.move_up = True
+            self.move_down = False
+            screen.blit(storage.fade_image, storage.fade_image.get_rect())
             for i in range(len(self.buttons)):
                 self.buttons[i].rect.x = self.local_x
                 self.buttons[i].rect.y = self.local_y + i * 100
                 self.buttons[i].draw()
+
         if not self.in_menu:
-            if not self.move_up:
-                self.moving_down()
-            if self.fade_in:
-                fade = storage.fade_image
-                fade.set_alpha(255 - self.fade_alpha)
-                screen.blit(fade, fade.get_rect())
-                if fade.get_alpha() > 0:
-                    self.fade_alpha += 1
-                else:
-                    self.fade_in = False
+            self.move_down = True
+            self.move_up = False
+            for i in range(len(self.buttons)):
+                self.buttons[i].rect.x = self.local_x
+                self.buttons[i].rect.y = self.local_y + i * 100
+                self.buttons[i].draw()
+
     def buttons_is_pressed(self):
         for button in self.buttons:
             button.is_clicked()
 
     def moving_up(self):
-        self.move_up = True
-        self.local_y -= 15
         if self.local_y < 200:
             self.move_up = False
+        if self.move_up:
+            self.local_y -= 15
 
     def moving_down(self):
-        self.local_y += 15
-        if self.local_y > 300:
-            self.move_up = True
+        if self.local_y > 800:
+            self.move_down = False
+        if self.move_down:
+            self.local_y += 15
+
 
     def start(self):
         self.in_menu = False
@@ -200,7 +198,10 @@ class Background:
 
     def update(self):
         animation(self, storage.background_images, 600, True)
-        screen.blit(self.image,self.rect)
+
+    def draw(self):
+        screen.blit(self.image, self.rect)
+
 # класс для загрузки всех спрайтов
 class Storage:
     def __init__(self):
@@ -211,6 +212,7 @@ class Storage:
         self.fade_image = pygame.transform.scale(
             pygame.image.load(
                 resource_path(os.path.join("venv\\Sprites\\fade.png"))).convert_alpha(), (WIDTH,HEIGHT))
+        self.fade_image.set_alpha(125)
         self.floor_image = pygame.transform.scale(
             pygame.image.load(
                 resource_path(os.path.join("venv\\Sprites\\floor.png"))).convert_alpha(), (WIDTH,400))
@@ -301,10 +303,13 @@ spawner = Spawner()
 menu = Menu()
 # переменная от которой зависит цикл игры
 running = True
+GAME_OVER = False
+GAME_STARTED = False
 
 while running:
     # установка определенное колличество кадров в секунду (в нашем случае 60)
     clock.tick(FPS)
+    PAUSED = menu.in_menu
     # цикл для прослушивания всех событий в игре
     for event in pygame.event.get():
         # если игрок закрывает окно, то прекратить цикл
@@ -312,13 +317,19 @@ while running:
             running = False
         if event.type == pygame.constants.MOUSEBUTTONDOWN:
             menu.buttons_is_pressed()
-    background.update()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                PAUSED = not PAUSED
+                menu.in_menu = not menu.in_menu
+    if not PAUSED:
+        background.update()
+        spawner.update()
+        mouse.update()
+        cheeses.update()
 
-
-    spawner.update()
-    mouse.update()
-    cheeses.update()
+    background.draw()
     cheeses.draw(screen)
+    mouse.draw()
     screen.blit(storage.floor_image, storage.floor_rect)
     menu.update()
     screen.blit(storage.foreground_image,storage.foreground_rect)
