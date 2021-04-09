@@ -43,7 +43,7 @@ class Mouse:
         self.speedx = 0
         self.last_sprite_update = pygame.time.get_ticks()
         self.i = 0
-        self.lives = 7
+        self.lives = 3
         self.is_right = True
 
     def update(self):
@@ -62,6 +62,11 @@ class Mouse:
                 self.rect.left = 1100
             if self.rect.left < 0:
                 self.rect.left = 0
+        else:
+            menu.in_menu = True
+            self.lives = 3
+            scores_.scores = 0
+            cheeses.empty()
 
     def draw(self):
         screen.blit(pygame.transform.flip(self.image, self.is_right, False), self.rect)
@@ -90,9 +95,11 @@ class Cheese(pygame.sprite.Sprite):
         if self.is_alive:
             if is_collided_with(self, mouse):
                 self.speedy = 0
+                sound_mixer.sounds["cheese_sound"].play(0)
                 scores_.scores += 1
                 self.is_alive = False
             if self.rect.bottom > HEIGHT:
+                mouse.take_damage()
                 self.speedy = 0
                 self.is_alive = False
         else:
@@ -126,6 +133,7 @@ class Button:
 
     def is_clicked(self):
         if mouse_in_rect(self):
+            sound_mixer.sounds["cheese_sound"].play(0)
             self.func()
 
     def load_button_image(self, name, scaleX, scaleY):
@@ -202,6 +210,20 @@ class Background:
     def draw(self):
         screen.blit(self.image, self.rect)
 
+class Sound_mixer():
+    def __init__(self):
+        self.volume = 0.1
+        self.sounds = {"cheese_sound": self.load_sound("cheese_sound")}
+
+    def load_sound(self, name):
+        path = resource_path(os.path.join("venv\\Sounds\\", name + ".wav"))
+        return pygame.mixer.Sound(path)
+
+    def update(self):
+        mixer.music.set_volume(self.volume)
+        for sound in self.sounds.keys():
+            self.sounds[sound].set_volume(self.volume)
+
 # класс для загрузки всех спрайтов
 class Storage:
     def __init__(self):
@@ -222,6 +244,13 @@ class Storage:
             resource_path(os.path.join("venv\\Sprites\\foreground.png"))).convert_alpha()
         self.foreground_rect = self.foreground_image.get_rect()
 
+class Lives:
+    def __init__(self):
+        pass
+
+    def drow(self):
+        print_text(f"LIVES: {mouse.lives}",30, WHITE, 50, 85)
+
 class Spawner:
     def __init__(self):
         self.speed = 1400
@@ -234,7 +263,7 @@ class Spawner:
         mouse.move_speed = scores_.scores/10 + 5
         if now - self.last_update > self.speed - scores_.scores*5:
             self.last_update = now
-            cheese = Cheese(random.randint(100, 1000), 2 + scores_.scores/10)
+            cheese = Cheese(random.randint(100, 1000), 2 + scores_.scores/20)
             cheeses.add(cheese)
             self.i += 1
             self.difficulty += self.difficulty / self.i
@@ -290,7 +319,7 @@ def load_images(name, count, scaleX,scaleY):
 
 # метод для отображения текста на экране
 def print_text(text, size, color, x, y):
-    font = pygame.font.SysFont('Arial', size)
+    font = pygame.font.Font(resource_path(os.path.join("venv\\Fonts\\", "main_font.ttf")), size)
     screen.blit(font.render(text, True, color), (x, y))
 
 storage = Storage()
@@ -301,10 +330,17 @@ mouse = Mouse()
 scores_ = Scores()
 spawner = Spawner()
 menu = Menu()
+lives = Lives()
+sound_mixer = Sound_mixer()
+
 # переменная от которой зависит цикл игры
 running = True
 GAME_OVER = False
 GAME_STARTED = False
+
+mixer.music.load(resource_path(os.path.join("venv\\Sounds\\","MOUSE_SAUSAGE.mp3")))
+mixer.music.set_volume(0.2)
+mixer.music.play(-1)
 
 while running:
     # установка определенное колличество кадров в секунду (в нашем случае 60)
@@ -333,6 +369,7 @@ while running:
     screen.blit(storage.floor_image, storage.floor_rect)
     menu.update()
     screen.blit(storage.foreground_image,storage.foreground_rect)
+    lives.drow()
     scores_.update()
     print_text(str(int(clock.get_fps())), 10, WHITE, 5, 5)
     pygame.display.flip()
