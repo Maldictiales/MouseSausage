@@ -365,9 +365,9 @@ class About_us:
         self.exit_button.rect.y = 600
         self.exit_button.rect.x = 1000
         self.authors = [Info_node(x=500, y=50, header="Kira Beznik",
-                                  main=["telegram", "github"],
-                                  links=["https://web.telegram.org/#/im?p=@Maldictiales",
-                                         "https://github.com/Maldictiales"]),
+                                  main=["instagram", "deviant"],
+                                  links=["https://www.instagram.com/marise_art/?hl=ru",
+                                         "https://www.deviantart.com/mariseart"]),
                         Info_node(x=500, y=300, header="RusKom",
                                   main=["telegram", "github"],
                                   links=["https://web.telegram.org/#/im?p=@RusK0m", "https://github.com/RusKom27"]),
@@ -428,7 +428,6 @@ class Info_node:
         for rect in range(len(self.main_rects)):
             if type(self.main_rects[rect]) == type(self.rect):
                 if mouse_in_rect(self.main_rects[rect]):
-                    sound_mixer_.sounds["tv_sound_buttons"].play(0)
                     if not self.links[rect] == "":
                         webbrowser.open_new_tab(self.links[rect])
 
@@ -530,6 +529,8 @@ while running:
                 menu.buttons_is_pressed()
             elif about_us.in_view:
                 about_us.exit_button.is_clicked()
+                for link in about_us.authors:
+                    link.click()
             elif menu.in_settings:
                 menu.button_to_menu.is_clicked()
                 menu.button_add_volume.is_clicked()
